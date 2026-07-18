@@ -1,0 +1,14 @@
+# Compiled binaries
+tg-ws-proxy
+mtproto_test
+
+# Object files
+obj/
+*.o
+
+# Configuration and secrets
+config.json
+
+# Logs
+*.log
+*.err
