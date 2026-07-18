@@ -121,6 +121,17 @@ void install_autostart(int argc, char *argv[]) {
             system("rc-update add tg-ws-proxy default");
             system("rc-service tg-ws-proxy start");
         }
+    } else if (access("/etc/sv", F_OK) == 0 || access("/var/service", F_OK) == 0) {
+        system("mkdir -p /etc/sv/tg-ws-proxy");
+        FILE *f = fopen("/etc/sv/tg-ws-proxy/run", "w");
+        if (f) {
+            fprintf(f, "#!/bin/sh\nexec chpst -u %s %s 8080\n", user, exe_path);
+            fclose(f);
+            chmod("/etc/sv/tg-ws-proxy/run", 0755);
+            system("ln -s /etc/sv/tg-ws-proxy /var/service/ 2>/dev/null");
+            system("ln -s /etc/sv/tg-ws-proxy /etc/service/ 2>/dev/null");
+            system("sv start tg-ws-proxy");
+        }
     } else {
         system("mkdir -p /etc/dinit.d");
         FILE *f = fopen("/etc/dinit.d/tg-ws-proxy", "w");
