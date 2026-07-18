@@ -233,7 +233,8 @@ void handle_socks5(int client_fd) {
         FD_SET(target_fd, &readfds);
 
         if (select(max_fd + 1, &readfds, NULL, NULL, NULL) < 0) {
-            if (errno == EINTR) continue; break;
+            if (errno == EINTR) continue;
+            break;
         }
 
         if (FD_ISSET(client_fd, &readfds)) {
@@ -277,7 +278,8 @@ void handle_mtproto_wss(int client_fd) {
         FD_SET(wss_fd, &readfds);
 
         if (select(max_fd + 1, &readfds, NULL, NULL, NULL) < 0) {
-            if (errno == EINTR) continue; break;
+            if (errno == EINTR) continue;
+            break;
         }
 
         if (FD_ISSET(client_fd, &readfds)) {
@@ -349,8 +351,8 @@ int main(int argc, char *argv[]) {
 
     proxy_log(0, "====================================================\n");
     proxy_log(0, "Telegram Multiplexed Proxy (C Version) on port %d\n", port);
-    proxy_log(0, "1. MTProto Proxy Link:\n   tg:
-    proxy_log(0, "2. SOCKS5 Proxy Link:\n   tg:
+    proxy_log(0, "1. MTProto Proxy Link:\n   tg://proxy?server=127.0.0.1&port=%d&secret=%s\n", port, secret);
+    proxy_log(0, "2. SOCKS5 Proxy Link:\n   tg://socks?server=127.0.0.1&port=%d\n", port);
     proxy_log(0, "====================================================\n");
 
     while (1) {
