@@ -10,13 +10,13 @@
 #include <openssl/rand.h>
 #include <openssl/evp.h>
 
-// Вспомогательная функция кодирования в Base64
+
 static void base64_encode(const unsigned char *input, int length, char *output) {
     EVP_EncodeBlock((unsigned char *)output, input, length);
 }
 
 SSL *ws_connect(const char *host, int port, const char *path) {
-    // 1. Инициализация OpenSSL
+    
     SSL_library_init();
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
@@ -25,7 +25,7 @@ SSL *ws_connect(const char *host, int port, const char *path) {
     SSL_CTX *ctx = SSL_CTX_new(method);
     if (!ctx) return NULL;
 
-    // 2. Создание TCP сокета
+    
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     struct hostent *server = gethostbyname(host);
     if (!server) return NULL;
@@ -41,10 +41,10 @@ SSL *ws_connect(const char *host, int port, const char *path) {
         return NULL;
     }
 
-    // 3. Установка TLS соединения
+    
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sock);
-    SSL_set_tlsext_host_name(ssl, host); // SNI
+    SSL_set_tlsext_host_name(ssl, host); 
 
     if (SSL_connect(ssl) <= 0) {
         SSL_free(ssl);
@@ -52,13 +52,13 @@ SSL *ws_connect(const char *host, int port, const char *path) {
         return NULL;
     }
 
-    // 4. Генерация ключа Sec-WebSocket-Key
+    
     unsigned char random_key[16];
     char b64_key[25];
     RAND_bytes(random_key, 16);
     base64_encode(random_key, 16, b64_key);
 
-    // 5. Отправка HTTP Upgrade запроса
+    
     char request[1024];
     snprintf(request, sizeof(request),
              "GET %s HTTP/1.1\r\n"
@@ -71,7 +71,7 @@ SSL *ws_connect(const char *host, int port, const char *path) {
 
     SSL_write(ssl, request, strlen(request));
 
-    // 6. Чтение ответа сервера (очень упрощенно)
+    
     char response[2048];
     int bytes = SSL_read(ssl, response, sizeof(response) - 1);
     if (bytes > 0) {
@@ -92,10 +92,10 @@ int ws_send_frame(SSL *ssl, const unsigned char *data, size_t len) {
     unsigned char frame[8192];
     int header_len = 0;
     
-    frame[0] = 0x82; // FIN + Binary frame
+    frame[0] = 0x82; 
     
     if (len < 126) {
-        frame[1] = len | 0x80; // С маской
+        frame[1] = len | 0x80; 
         header_len = 2;
     } else if (len <= 65535) {
         frame[1] = 126 | 0x80;
@@ -103,16 +103,16 @@ int ws_send_frame(SSL *ssl, const unsigned char *data, size_t len) {
         frame[3] = len & 0xFF;
         header_len = 4;
     } else {
-        return -1; // Слишком большой фрейм для упрощенной версии
+        return -1; 
     }
 
-    // Генерация маски (клиент обязан маскировать данные)
+    
     unsigned char mask[4];
     RAND_bytes(mask, 4);
     memcpy(frame + header_len, mask, 4);
     header_len += 4;
 
-    // Маскируем данные
+    
     for (size_t i = 0; i < len; i++) {
         frame[header_len + i] = data[i] ^ mask[i % 4];
     }
@@ -134,7 +134,7 @@ int ws_recv_frame(SSL *ssl, unsigned char *out_buf, size_t max_len) {
         payload_len = (ext_len[0] << 8) | ext_len[1];
     }
 
-    if (payload_len > (int)max_len) return -1; // Буфер маловат
+    if (payload_len > (int)max_len) return -1; 
 
     unsigned char mask[4] = {0};
     if (is_masked) {

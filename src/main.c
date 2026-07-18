@@ -22,7 +22,7 @@
 
 int run_as_daemon = 0;
 
-// Массив зашифрованных доменов Cloudflare из оригинального скрипта
+
 const char* CFPROXY_ENC[] = {
     "virkgj.com", "vmmzovy.com", "mkuosckvso.com", "zaewayzmplad.com",
     "twdmbzcm.com", "awzwsldi.com", "clngqrflngqin.com", "tjacxbqtj.com",
@@ -32,7 +32,7 @@ const char* CFPROXY_ENC[] = {
 };
 #define CFPROXY_COUNT (sizeof(CFPROXY_ENC)/sizeof(CFPROXY_ENC[0]))
 
-// Кастомный логгер (Syslog в демоне, stdout в консоли)
+
 void proxy_log(int level, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -44,7 +44,7 @@ void proxy_log(int level, const char *fmt, ...) {
     va_end(args);
 }
 
-// Расшифровка домена по алгоритму _dd() из Python
+
 void decode_domain(const char *s, char *out) {
     int len = strlen(s);
     if (len < 4 || strcmp(s + len - 4, ".com") != 0) {
@@ -71,7 +71,7 @@ void decode_domain(const char *s, char *out) {
     strcpy(out + p_len, ".co.uk");
 }
 
-// Функция автозапуска
+
 void install_autostart(int argc, char *argv[]) {
     if (geteuid() != 0) {
         printf("[INFO] To configure autostart, the program needs root privileges.\n");
@@ -169,7 +169,7 @@ void load_or_generate_secret(char *secret_out) {
     }
 }
 
-// Обработка SOCKS5 соединений
+
 void handle_socks5(int client_fd) {
     unsigned char buf[BUFFER_SIZE];
     proxy_log(0, "[INFO] SOCKS5 Protocol Selected.\n");
@@ -238,7 +238,7 @@ void handle_socks5(int client_fd) {
     close(client_fd);
 }
 
-// Обработка MTProto FakeTLS через WSS
+
 void handle_mtproto_wss(int client_fd) {
     unsigned char buf[BUFFER_SIZE];
     
@@ -283,13 +283,13 @@ void handle_mtproto_wss(int client_fd) {
     close(client_fd);
 }
 
-// Основной хэндлер, который определяет протокол (Multiplexer)
+
 void *handle_client(void *client_socket_ptr) {
     int client_fd = *((int *)client_socket_ptr);
     free(client_socket_ptr);
     
     unsigned char first_byte;
-    // Считываем 1 байт не удаляя его из буфера (PEEK)
+    
     if (recv(client_fd, &first_byte, 1, MSG_PEEK) <= 0) {
         close(client_fd);
         return NULL;
@@ -338,8 +338,8 @@ int main(int argc, char *argv[]) {
 
     proxy_log(0, "====================================================\n");
     proxy_log(0, "Telegram Multiplexed Proxy (C Version) on port %d\n", port);
-    proxy_log(0, "1. MTProto Proxy Link:\n   tg://proxy?server=127.0.0.1&port=%d&secret=%s\n", port, secret);
-    proxy_log(0, "2. SOCKS5 Proxy Link:\n   tg://socks?server=127.0.0.1&port=%d\n", port);
+    proxy_log(0, "1. MTProto Proxy Link:\n   tg:
+    proxy_log(0, "2. SOCKS5 Proxy Link:\n   tg:
     proxy_log(0, "====================================================\n");
 
     while (1) {

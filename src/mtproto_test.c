@@ -8,7 +8,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-#define TARGET_IP "149.154.167.50" // Telegram DC2 IP
+#define TARGET_IP "149.154.167.50" 
 #define TARGET_PORT 443
 
 void reverse_bytes(unsigned char *src, unsigned char *dst, size_t len) {
