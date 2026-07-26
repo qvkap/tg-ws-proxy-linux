@@ -256,8 +256,10 @@ void handle_mtproto_wss(int client_fd) {
     unsigned char buf[BUFFER_SIZE];
     
     int rand_idx = rand() % CFPROXY_COUNT;
+    char base_domain[256];
+    decode_domain(CFPROXY_ENC[rand_idx], base_domain);
     char target_host[256];
-    decode_domain(CFPROXY_ENC[rand_idx], target_host);
+    snprintf(target_host, sizeof(target_host), "kws2.%s", base_domain);
 
     proxy_log(0, "[INFO] MTProto Selected. WSS routing to worker: %s via direct Telegram IP\n", target_host);
         
@@ -267,14 +269,34 @@ void handle_mtproto_wss(int client_fd) {
     int wss_fd = -1;
     if (!wss) {
         proxy_log(1, "[ERROR] Failed to establish WSS tunnel to %s, falling back to direct TCP...\n", target_host);
-        wss_fd = socket(AF_INET, SOCK_STREAM, 0);
-        struct sockaddr_in tg_addr;
-        tg_addr.sin_family = AF_INET;
-        tg_addr.sin_port = htons(443);
-        tg_addr.sin_addr.s_addr = inet_addr("149.154.167.50");
-        if (connect(wss_fd, (struct sockaddr *)&tg_addr, sizeof(tg_addr)) < 0) {
-            proxy_log(1, "[ERROR] Direct TCP fallback failed\n");
+        
+        const char *tg_ips[] = {"149.154.167.50", "149.154.167.51", "91.108.12.114", "91.108.12.115"};
+        int num_ips = 4;
+        
+        for (int i = 0; i < num_ips; i++) {
+            wss_fd = socket(AF_INET, SOCK_STREAM, 0);
+            struct sockaddr_in tg_addr;
+            tg_addr.sin_family = AF_INET;
+            tg_addr.sin_port = htons(443);
+            tg_addr.sin_addr.s_addr = inet_addr(tg_ips[i]);
+            
+            // set connect timeout to 2 seconds
+            struct timeval tv;
+            tv.tv_sec = 2; tv.tv_usec = 0;
+            setsockopt(wss_fd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof tv);
+            
+            if (connect(wss_fd, (struct sockaddr *)&tg_addr, sizeof(tg_addr)) == 0) {
+                proxy_log(1, "[INFO] Connected directly to Telegram IP: %s\n", tg_ips[i]);
+                tv.tv_sec = 0;
+                setsockopt(wss_fd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof tv);
+                break;
+            }
             close(wss_fd);
+            wss_fd = -1;
+        }
+
+        if (wss_fd < 0) {
+            proxy_log(1, "[ERROR] All direct TCP fallbacks failed. ISP might be blocking all TG IPs.\n");
             close(client_fd);
             return;
         }
