@@ -13,6 +13,7 @@
 #include <syslog.h>
 #include <stdarg.h>
 #include <time.h>
+#include <signal.h>
 #include "ws_client.h"
 
 #define DEFAULT_PORT 8080
@@ -263,13 +264,24 @@ void handle_mtproto_wss(int client_fd) {
     // Connect directly to Telegram DC (149.154.167.50) but spoof the SNI and Host headers to look like Cloudflare!
     // Using sprinthost.ru as SNI because Telegram accepts it, but sending target_host as HTTP Host
     SSL *wss = ws_connect("149.154.167.50", 443, "sprinthost.ru", target_host, TARGET_PATH);
+    int wss_fd = -1;
     if (!wss) {
-        proxy_log(1, "[ERROR] Failed to establish WSS tunnel to %s\n", target_host);
-        close(client_fd);
-        return;
+        proxy_log(1, "[ERROR] Failed to establish WSS tunnel to %s, falling back to direct TCP...\n", target_host);
+        wss_fd = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in tg_addr;
+        tg_addr.sin_family = AF_INET;
+        tg_addr.sin_port = htons(443);
+        tg_addr.sin_addr.s_addr = inet_addr("149.154.167.50");
+        if (connect(wss_fd, (struct sockaddr *)&tg_addr, sizeof(tg_addr)) < 0) {
+            proxy_log(1, "[ERROR] Direct TCP fallback failed\n");
+            close(wss_fd);
+            close(client_fd);
+            return;
+        }
+    } else {
+        wss_fd = SSL_get_fd(wss);
     }
 
-    int wss_fd = SSL_get_fd(wss);
     fd_set readfds;
     int max_fd = (client_fd > wss_fd) ? client_fd : wss_fd;
     ssize_t bytes_read;
@@ -286,15 +298,24 @@ void handle_mtproto_wss(int client_fd) {
 
         if (FD_ISSET(client_fd, &readfds)) {
             if ((bytes_read = recv(client_fd, buf, sizeof(buf), 0)) <= 0) break;
-            if (ws_send_frame(wss, buf, bytes_read) <= 0) break;
+            if (wss) {
+                if (ws_send_frame(wss, buf, bytes_read) <= 0) break;
+            } else {
+                if (send(wss_fd, buf, bytes_read, 0) < 0) break;
+            }
         }
 
         if (FD_ISSET(wss_fd, &readfds)) {
-            if ((bytes_read = ws_recv_frame(wss, buf, sizeof(buf))) <= 0) break;
+            if (wss) {
+                if ((bytes_read = ws_recv_frame(wss, buf, sizeof(buf))) <= 0) break;
+            } else {
+                if ((bytes_read = recv(wss_fd, buf, sizeof(buf), 0)) <= 0) break;
+            }
             if (send(client_fd, buf, bytes_read, 0) < 0) break;
         }
     }
-    ws_close(wss);
+    if (wss) ws_close(wss);
+    else close(wss_fd);
     close(client_fd);
 }
 
@@ -320,6 +341,7 @@ void *handle_client(void *client_socket_ptr) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGPIPE, SIG_IGN);
     srand(time(NULL));
     int server_fd, new_socket;
     struct sockaddr_in address;

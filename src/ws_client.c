@@ -69,12 +69,18 @@ SSL *ws_connect(const char *ip, int port, const char *sni, const char *host_head
 
     SSL_write(ssl, request, strlen(request));
 
-    
+    struct timeval tv;
+    tv.tv_sec = 2;
+    tv.tv_usec = 0;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+
     char response[2048];
     int bytes = SSL_read(ssl, response, sizeof(response) - 1);
     if (bytes > 0) {
         response[bytes] = '\0';
         if (strstr(response, "101 Switching Protocols") != NULL) {
+            tv.tv_sec = 0;
+            setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
             printf("[WS] Successful WSS connection to %s (via %s, SNI: %s)\n", host_header, ip, sni);
             return ssl;
         }
