@@ -5,7 +5,7 @@
 #include <openssl/err.h>
 
 
-SSL *ws_connect(const char *host, int port, const char *path);
+SSL *ws_connect(const char *ip, int port, const char *sni, const char *host_header, const char *path);
 
 
 int ws_send_frame(SSL *ssl, const unsigned char *data, size_t len);

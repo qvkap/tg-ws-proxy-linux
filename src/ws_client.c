@@ -15,7 +15,7 @@ static void base64_encode(const unsigned char *input, int length, char *output) 
     EVP_EncodeBlock((unsigned char *)output, input, length);
 }
 
-SSL *ws_connect(const char *host, int port, const char *path) {
+SSL *ws_connect(const char *ip, int port, const char *sni, const char *host_header, const char *path) {
     
     SSL_library_init();
     OpenSSL_add_all_algorithms();
@@ -27,14 +27,12 @@ SSL *ws_connect(const char *host, int port, const char *path) {
 
     
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct hostent *server = gethostbyname(host);
-    if (!server) return NULL;
 
     struct sockaddr_in serv_addr;
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+    serv_addr.sin_addr.s_addr = inet_addr(ip);
 
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         close(sock);
@@ -44,7 +42,7 @@ SSL *ws_connect(const char *host, int port, const char *path) {
     
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sock);
-    SSL_set_tlsext_host_name(ssl, host); 
+    SSL_set_tlsext_host_name(ssl, sni); 
 
     if (SSL_connect(ssl) <= 0) {
         SSL_free(ssl);
@@ -67,7 +65,7 @@ SSL *ws_connect(const char *host, int port, const char *path) {
              "Connection: Upgrade\r\n"
              "Sec-WebSocket-Key: %s\r\n"
              "Sec-WebSocket-Version: 13\r\n"
-             "\r\n", path, host, b64_key);
+             "\r\n", path, host_header, b64_key);
 
     SSL_write(ssl, request, strlen(request));
 
@@ -77,7 +75,7 @@ SSL *ws_connect(const char *host, int port, const char *path) {
     if (bytes > 0) {
         response[bytes] = '\0';
         if (strstr(response, "101 Switching Protocols") != NULL) {
-            printf("[WS] Successful WSS connection to %s\n", host);
+            printf("[WS] Successful WSS connection to %s (via %s, SNI: %s)\n", host_header, ip, sni);
             return ssl;
         }
     }

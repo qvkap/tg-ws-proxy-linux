@@ -8,8 +8,8 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-#define TARGET_IP "149.154.167.50" 
-#define TARGET_PORT 443
+#define TARGET_IP "127.0.0.1" 
+#define TARGET_PORT 8080
 
 void reverse_bytes(unsigned char *src, unsigned char *dst, size_t len) {
     for (size_t i = 0; i < len; i++) {

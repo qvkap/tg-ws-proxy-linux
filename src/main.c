@@ -257,10 +257,12 @@ void handle_mtproto_wss(int client_fd) {
     int rand_idx = rand() % CFPROXY_COUNT;
     char target_host[256];
     decode_domain(CFPROXY_ENC[rand_idx], target_host);
-    
-    proxy_log(0, "[INFO] MTProto Selected. WSS routing to worker: %s\n", target_host);
 
-    SSL *wss = ws_connect(target_host, 443, TARGET_PATH);
+    proxy_log(0, "[INFO] MTProto Selected. WSS routing to worker: %s via direct Telegram IP\n", target_host);
+        
+    // Connect directly to Telegram DC (149.154.167.50) but spoof the SNI and Host headers to look like Cloudflare!
+    // Using sprinthost.ru as SNI because Telegram accepts it, but sending target_host as HTTP Host
+    SSL *wss = ws_connect("149.154.167.50", 443, "sprinthost.ru", target_host, TARGET_PATH);
     if (!wss) {
         proxy_log(1, "[ERROR] Failed to establish WSS tunnel to %s\n", target_host);
         close(client_fd);
