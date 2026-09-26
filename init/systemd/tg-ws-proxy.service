@@ -5,8 +5,8 @@ After=network.target
 [Service]
 Type=simple
 User=rorka
-WorkingDirectory=/home/rorka/tg-ws-proxy-linux
-ExecStart=/home/rorka/tg-ws-proxy-linux/tg-ws-proxy 8080
+WorkingDirectory=/home/rorka/tg-ws-proxy-unix
+ExecStart=/home/rorka/tg-ws-proxy-unix/tg-ws-proxy 8080
 Restart=always
 RestartSec=3
 

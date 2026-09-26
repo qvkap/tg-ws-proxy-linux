@@ -14,6 +14,9 @@
 #include <stdarg.h>
 #include <time.h>
 #include <signal.h>
+#ifdef __FreeBSD__
+#include <sys/sysctl.h>
+#endif
 #include "ws_client.h"
 
 #define DEFAULT_PORT 8080
@@ -43,6 +46,53 @@ void proxy_log(int level, const char *fmt, ...) {
         vprintf(fmt, args);
     }
     va_end(args);
+}
+
+void censor_domain(const char *domain, char *out) {
+    char temp[256];
+    strncpy(temp, domain, sizeof(temp)-1);
+    temp[sizeof(temp)-1] = '\0';
+
+    int len = strlen(temp);
+    if (len >= 12 && strcmp(temp + len - 12, "telegram.org") == 0) {
+        strcpy(out, domain);
+        return;
+    }
+
+    out[0] = '\0';
+    char *saveptr;
+    char *token = strtok_r(temp, ".", &saveptr);
+    char *parts[32];
+    int part_count = 0;
+    while (token && part_count < 32) {
+        parts[part_count++] = token;
+        token = strtok_r(NULL, ".", &saveptr);
+    }
+
+    if (part_count < 2) {
+        strcpy(out, domain);
+        return;
+    }
+
+    for (int i = 0; i < part_count; i++) {
+        if (i > 0) strcat(out, ".");
+
+        if (i == part_count - 1) {
+            strcat(out, parts[i]);
+        } else {
+            int p_len = strlen(parts[i]);
+            int half = p_len / 2;
+            int out_len = strlen(out);
+            for (int j = 0; j < p_len; j++) {
+                if (j < half) {
+                    out[out_len + j] = parts[i][j];
+                } else {
+                    out[out_len + j] = '*';
+                }
+            }
+            out[out_len + p_len] = '\0';
+        }
+    }
 }
 
 
@@ -91,8 +141,16 @@ void install_autostart(int argc, char *argv[]) {
     }
 
     char exe_path[512];
+#ifdef __FreeBSD__
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+    size_t cb = sizeof(exe_path);
+    if (sysctl(mib, 4, exe_path, &cb, NULL, 0) != 0) {
+        strcpy(exe_path, "/opt/tg-ws-proxy-unix/tg-ws-proxy");
+    }
+#else
     ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path)-1);
-    if (len == -1) strcpy(exe_path, "/opt/tg-ws-proxy-linux/tg-ws-proxy"); else exe_path[len] = '\0';
+    if (len == -1) strcpy(exe_path, "/opt/tg-ws-proxy-unix/tg-ws-proxy"); else exe_path[len] = '\0';
+#endif
 
     char *user = getenv("SUDO_USER");
     if (!user) user = getenv("DOAS_USER");
@@ -110,6 +168,17 @@ void install_autostart(int argc, char *argv[]) {
             system("systemctl enable tg-ws-proxy");
             system("systemctl start tg-ws-proxy");
         }
+#ifdef __FreeBSD__
+    } else if (access("/etc/rc.d", F_OK) == 0) {
+        FILE *f = fopen("/etc/rc.d/tg_ws_proxy", "w");
+        if (f) {
+            fprintf(f, "#!/bin/sh\n# PROVIDE: tg_ws_proxy\n# REQUIRE: NETWORKING\n\n. /etc/rc.subr\n\nname=\"tg_ws_proxy\"\nrcvar=\"tg_ws_proxy_enable\"\n\ncommand=\"%s\"\ncommand_args=\"8080 --daemon\"\npidfile=\"/var/run/${name}.pid\"\n\nload_rc_config $name\nrun_rc_command \"$1\"\n", exe_path);
+            fclose(f);
+            chmod("/etc/rc.d/tg_ws_proxy", 0755);
+            system("sysrc tg_ws_proxy_enable=YES");
+            system("service tg_ws_proxy start");
+        }
+#endif
     } else if (access("/run/openrc", F_OK) == 0) {
         FILE *f = fopen("/etc/init.d/tg-ws-proxy", "w");
         if (f) {
@@ -261,7 +330,9 @@ void handle_mtproto_wss(int client_fd) {
     char target_host[256];
     snprintf(target_host, sizeof(target_host), "kws2.%s", base_domain);
 
-    proxy_log(0, "[INFO] MTProto Selected. WSS routing to worker: %s via direct Telegram IP\n", target_host);
+    char censored_target_host[256];
+    censor_domain(target_host, censored_target_host);
+    proxy_log(0, "[INFO] MTProto Selected. WSS routing to worker: %s via direct Telegram IP\n", censored_target_host);
         
     // Connect directly to Telegram DC (149.154.167.50) but spoof the SNI and Host headers to look like Cloudflare!
     // Using sprinthost.ru as SNI because Telegram accepts it, but sending target_host as HTTP Host
