@@ -20,7 +20,7 @@ Unlike the Python version which requires megabytes of RAM and heavy interpreters
 Simply clone the repository (if you haven't) and run `make`:
 
 ```bash
-cd tg-ws-proxy-linux
+cd tg-ws-proxy-unix
 make
 ```
 

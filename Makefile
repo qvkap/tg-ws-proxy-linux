@@ -1,7 +1,7 @@
-# Makefile for tg-ws-proxy-linux
+# Makefile for tg-ws-proxy-unix
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -I./include
-LDFLAGS = -lpthread -lssl -lcrypto
+LDFLAGS = -pthread -lssl -lcrypto
 
 SRC_DIR = src
 OBJ_DIR = obj
